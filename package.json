@@ -1,0 +1,19 @@
+{
+  "name": "superbotgo-docs",
+  "version": "1.0.0",
+  "description": "Documentation site for SuperBotGo",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "mermaid": "^11.13.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
