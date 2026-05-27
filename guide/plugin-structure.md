@@ -1,6 +1,13 @@
 # Структура плагина
 
-Плагин - это один бинарный `.wasm` файл. Вся логика описывается структурой `Plugin` и передаётся в `wasmplugin.Run()`.
+Плагин состоит из WASM-модуля и, опционально, bundled frontend'а. Логика плагина описывается структурой `Plugin` и передаётся в `wasmplugin.Run()`.
+
+Загрузить можно два формата:
+
+- `.wasm` - только backend-логика плагина
+- `.zip` - bundle с `plugin.wasm` и frontend-файлами
+
+ZIP bundle используется, когда плагину нужна собственная web-админка или пользовательский frontend на том же origin, что и Core.
 
 ## Структура Plugin
 
@@ -54,6 +61,106 @@ wasmplugin.Plugin{
 ::: warning Нет общего состояния между вызовами
 Каждое выполнение получает чистое окружение. Используйте [KV Store](/api/kv-store) для хранения данных между вызовами.
 :::
+
+## Bundle С Frontend'ом
+
+Bundle - это обычный ZIP-архив со строгой структурой:
+
+```text
+my-plugin.zip
+├── plugin.wasm
+└── frontend/
+    ├── index.html
+    ├── app.js
+    └── styles.css
+```
+
+Правила:
+
+- основной WASM должен лежать в корне архива как `plugin.wasm`
+- если в корне есть ровно один `.wasm` файл с другим именем, host примет его как fallback
+- если в корне несколько `.wasm` файлов, основной файл нужно назвать `plugin.wasm`
+- `frontend/index.html` обязателен, если в архиве есть директория `frontend/`
+- frontend-assets берутся только из `frontend/`
+- после установки frontend доступен по адресу `/plugins/<plugin-id>/app/`
+- путь `/plugins/<plugin-id>/app/` защищён системной `admin_session`
+- HTTP-trigger API frontend вызывает отдельно через `/api/triggers/http/<plugin-id><path>` и проходит проверку `user_session`, service-key и policy
+
+Пример сборки:
+
+```bash
+GOOS=wasip1 GOARCH=wasm go build -o plugin.wasm .
+zip -Xqr my-plugin.zip plugin.wasm frontend/
+```
+
+При обновлении bundle host считает checksum каждого frontend-файла и перезаписывает только изменившиеся файлы.
+Неизменившиеся assets переиспользуются, а ответы frontend'а отдаются с `ETag`.
+
+### Безопасность ZIP
+
+Host валидирует архив до сохранения:
+
+- запрещены пути с `..`, обратным слешем и NUL-байтом
+- запрещены абсолютные пути; frontend-assets вне `frontend/` не публикуются
+- запрещены symlink, device, socket и другие нестандартные типы entries
+- действуют лимиты на количество файлов и суммарный размер frontend'а
+- чтение entries ограничено `io.LimitReader`
+- entries с подозрительно высоким compression ratio отклоняются
+
+Эти проверки защищают от zip-slip, неожиданных типов файлов и zip bomb сценариев.
+
+Подробнее про browser-login и cookie-модель frontend'ов: [Авторизация frontend'ов плагинов](/guide/plugin-frontend-auth).
+
+### Поддерживаемые Frontend'ы
+
+Bundle frontend - это static hosting. Поддерживается любой frontend, который после сборки превращается в набор статических файлов:
+
+- plain `HTML/CSS/JS`
+- React, Vue, Svelte, Solid, Preact и другие Vite/SPA приложения
+- Angular build output
+- Astro в static mode
+- SvelteKit с static adapter
+- Next.js/Nuxt только в режиме static export
+- Web Components, Lit, HTMX
+- browser-side WASM assets, если они лежат в `frontend/`
+
+Не поддерживается внутри bundle:
+
+- Node.js server
+- SSR runtime
+- backend routes фреймворка
+- server actions/loaders, которым нужен отдельный web server
+- dev server как часть production-размещения
+
+API для такого frontend'а должен жить в HTTP-trigger'ах плагина:
+
+```ts
+await fetch('/api/triggers/http/my-plugin/profile', {
+  credentials: 'include',
+})
+```
+
+Для Vite-приложений используйте относительную базу assets:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  base: './',
+})
+```
+
+SPA routing поддерживается через fallback на `index.html` для путей без расширения:
+
+```text
+/plugins/schedule/app/settings -> frontend/index.html
+/plugins/schedule/app/assets/app.js -> frontend/assets/app.js
+```
+
+Для переносимости между окружениями проще использовать hash routing:
+
+```text
+/plugins/schedule/app/#/settings
+```
 
 ## Протокол (actions)
 

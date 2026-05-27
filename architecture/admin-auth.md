@@ -7,6 +7,7 @@
 
 - Любой успешный вход в системную админку должен приводить к `admin_session`.
 - `user_session` не является админской сессией и не должен открывать `/api/admin/*`.
+- Успешный вход в системную админку также ставит `user_session`, чтобы bundled frontend'ы плагинов могли сразу вызывать свои HTTP-trigger API.
 - ТГУ.Аккаунты подтверждают личность, но admin access выдаётся только при наличии `admin_credentials`.
 - Назначение администратора создаёт `admin_credentials`: `global_user_id`, `email`, `password_hash`.
 
@@ -14,8 +15,8 @@
 
 | Вариант | Проверка | Результат |
 |---|---|---|
-| Email + password | `admin_credentials.email` + bcrypt password hash | `admin_session` |
-| ТГУ.Аккаунты | `global_users.tsu_accounts_id` -> `admin_credentials.global_user_id` | `admin_session` |
+| Email + password | `admin_credentials.email` + bcrypt password hash | `admin_session` + `user_session` |
+| ТГУ.Аккаунты | `global_users.tsu_accounts_id` -> `admin_credentials.global_user_id` | `admin_session` + `user_session` |
 
 ## Вход Через Email И Пароль
 
@@ -29,7 +30,9 @@ Content-Type: application/json
 }
 ```
 
-При успехе сервер ставит `admin_session`.
+При успехе сервер ставит `admin_session` и `user_session`.
+`admin_session` открывает системную админку и hosted frontend'ы под `/plugins/*`.
+`user_session` нужна этим frontend'ам для вызова HTTP-trigger API как обычный пользовательский principal.
 
 ## Вход Через ТГУ.Аккаунты
 
@@ -54,6 +57,7 @@ sequenceDiagram
     S->>DB: exists admin_credentials for global_user_id?
     alt credentials exist
         S-->>U: Set-Cookie admin_session
+        S-->>U: Set-Cookie user_session
         S-->>U: 302 -> /admin/plugins
     else credentials missing
         S-->>U: 302 -> /admin/plugins without admin_session
@@ -61,6 +65,7 @@ sequenceDiagram
 ```
 
 Если `admin_credentials` нет, пользователь остаётся обычным пользователем. ТГУ-вход сам по себе не назначает администратора.
+В этом случае flow может поставить `user_session`, но не должен ставить валидную `admin_session`.
 
 ## Назначение Администратора
 

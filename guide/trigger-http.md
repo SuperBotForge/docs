@@ -60,9 +60,11 @@ Host проверяет доступ **до вызова плагина**.
 
 ### Frontend-сценарий
 
-Для фронтенда рекомендуется использовать browser login через TSU и cookie-сессию host-системы:
+Для фронтенда рекомендуется использовать browser login через TSU и cookie-сессию host-системы.
+Если frontend поставляется в ZIP bundle вместе с плагином, host раздаёт его по адресу `/plugins/<plugin-id>/app/` на том же origin, что и Core.
+Это предпочтительный вариант для админок плагинов: cookies остаются first-party, CORS не нужен.
 
-1. Браузер уходит на `GET /api/auth/tsu/start?return_to=/app`
+1. Браузер уходит на `GET /api/auth/tsu/start?return_to=/plugins/my-plugin/app/`
 2. После callback host ставит `user_session`
 3. Frontend вызывает HTTP-trigger endpoint'ы с `credentials: 'include'`
 
@@ -74,6 +76,15 @@ await fetch('/api/triggers/http/my-plugin/profile', {
   credentials: 'include',
 })
 ```
+
+Для bundled frontend передавайте в `return_to` относительный path:
+
+```ts
+const returnTo = location.pathname + location.search + location.hash
+window.location.href = `/api/auth/tsu/start?return_to=${encodeURIComponent(returnTo)}`
+```
+
+Для внешнего frontend'а на другом origin нужно добавить origin в `Frontend origins плагина`. HTTP-trigger'ы наследуют список plugin-level origins, поэтому заполнять origin на каждом endpoint'е не нужно. Override на конкретном trigger'е используйте только для исключений.
 
 Если пользователь открывает защищённый HTML-trigger обычной навигацией браузера и ещё не вошёл в систему, host делает redirect на:
 

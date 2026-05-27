@@ -6,8 +6,8 @@
 | Сценарий | Для чего нужен | Итоговая сессия |
 |---|---|---|
 | [Привязка идентичности](/architecture/tsu-identity-linking) | связать `global_user` с записью `person` из университетского синка | не создаёт browser-сессию |
-| [Вход в системную админку](/architecture/admin-auth) | пустить назначенного администратора в `/admin/*` и `/api/admin/*` | `admin_session` |
-| [Frontend/admin UI плагина](/guide/plugin-frontend-auth) | авторизовать пользователя для HTTP-trigger frontend'а плагина | `user_session` |
+| [Вход в системную админку](/architecture/admin-auth) | пустить назначенного администратора в `/admin/*`, `/api/admin/*` и bundled frontend'ы `/plugins/*` | `admin_session` + `user_session` |
+| [Frontend/admin UI плагина](/guide/plugin-frontend-auth) | авторизовать пользователя для HTTP-trigger API frontend'а плагина | `user_session` |
 
 ## Общий OAuth Callback
 
@@ -32,6 +32,7 @@ sequenceDiagram
 
 `accountId` сохраняется как `global_users.tsu_accounts_id` и сопоставляется с `persons.external_id`.
 Дальше обработчик смотрит, какой flow был записан в `state`: link-flow, browser login для plugin frontend или admin login.
+Для browser login redirect проверяется через `return_to`: локальные path разрешены напрямую, same-origin absolute URL нормализуются в path, внешние URL разрешены только для origins, зарегистрированных у плагина.
 
 ## Границы Ответственности
 
