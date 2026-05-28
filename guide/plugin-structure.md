@@ -93,6 +93,38 @@ GOOS=wasip1 GOARCH=wasm go build -o plugin.wasm .
 zip -Xqr my-plugin.zip plugin.wasm frontend/
 ```
 
+Для Vite/React проекта обычно удобнее собирать frontend отдельно и копировать `dist` в `frontend/` внутри временной директории:
+
+```bash
+# backend
+GOOS=wasip1 GOARCH=wasm go build -ldflags="-s -w" -o plugin.wasm .
+
+# frontend
+cd ../my-plugin-client
+npm install
+npm run build
+
+# bundle
+cd ../my-plugin
+rm -rf .bundle
+mkdir -p .bundle/frontend
+cp plugin.wasm .bundle/plugin.wasm
+cp -R ../my-plugin-client/dist/. .bundle/frontend/
+(
+  cd .bundle
+  zip -Xqr ../my-plugin.zip plugin.wasm frontend
+)
+unzip -t my-plugin.zip
+```
+
+В результате archive должен содержать:
+
+```text
+plugin.wasm
+frontend/index.html
+frontend/assets/...
+```
+
 При обновлении bundle host считает checksum каждого frontend-файла и перезаписывает только изменившиеся файлы.
 Неизменившиеся assets переиспользуются, а ответы frontend'а отдаются с `ETag`.
 
@@ -146,6 +178,14 @@ await fetch('/api/triggers/http/my-plugin/profile', {
 // vite.config.ts
 export default defineConfig({
   base: './',
+})
+```
+
+Если используется React Router с browser history, задайте basename под hosted URL:
+
+```tsx
+export const router = createBrowserRouter(routes, {
+  basename: '/plugins/my-plugin/app',
 })
 ```
 

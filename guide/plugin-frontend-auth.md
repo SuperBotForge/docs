@@ -108,6 +108,29 @@ window.location.href = `/api/auth/tsu/start?return_to=${encodeURIComponent(retur
 
 Host дополнительно умеет нормализовать same-origin absolute URL в локальный path, но относительный `return_to` остаётся предпочтительным контрактом.
 
+Минимальная login-страница для bundled frontend:
+
+```tsx
+export function LoginPage() {
+  const login = () => {
+    const returnTo = location.pathname + location.search + location.hash
+    location.href = `/api/auth/tsu/start?return_to=${encodeURIComponent(returnTo)}`
+  }
+
+  return (
+    <main>
+      <h1>Вход</h1>
+      <button type="button" onClick={login}>
+        Войти через ТГУ
+      </button>
+    </main>
+  )
+}
+```
+
+После callback host поставит `user_session` и вернёт браузер на тот же URL.
+Если страница плагина открывается только администраторам, пользователь обычно уже имеет `admin_session`; `user_session` нужна frontend'у для HTTP-trigger API.
+
 ### Старт Логина Во Внешнем Frontend
 
 Для внешнего frontend'а можно передать полный URL, но его origin должен быть зарегистрирован в `Frontend origins плагина`.
